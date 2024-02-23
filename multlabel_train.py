@@ -1,13 +1,16 @@
+# 来自于ecg_ptbxl_benchmarking/blob/master/code/experiments/scp_experiment.py
+
 from utils import utils
 import torch
 from models import *
 from dataloaders import *
 
 datafolder = 'data/ptbxl/'
-sampling_frequency = 100
+sampling_frequency = 500
 data, raw_labels = utils.load_dataset(datafolder, sampling_frequency)
 
 
+# 71个子类不是都属于diagnostic，也有属于rhythm的，这里使用all的话就是把71个标签都用了
 task = 'diagnostic'
 labels = utils.compute_label_aggregations(raw_labels, datafolder, task)
 
@@ -28,7 +31,7 @@ test_fold = 10
 batch_size = 16
 hid_size = 64
 
-
+# 在ptb-xl文件中有这么一个标签
 X_test = data[labels.strat_fold == test_fold]
 y_test = Y[labels.strat_fold == test_fold]
 # 9th fold for validation (8th for now)

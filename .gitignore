@@ -131,3 +131,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+tmp_data/
+output*
+*.pkl
+*.pth
+*.txt
+*.ipynb
+*.npy
+.vscode

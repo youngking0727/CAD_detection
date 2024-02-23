@@ -16,6 +16,14 @@ from sklearn.preprocessing import StandardScaler, MultiLabelBinarizer
 from matplotlib.axes._axes import _log as matplotlib_axes_logger
 import warnings
 
+
+import time
+import datetime
+from collections import defaultdict, deque
+
+import torch
+import torch.distributed as dist
+
 # EVALUATION STUFF
 def generate_results(idxs, y_true, y_pred, thresholds):
     return evaluate_experiment(y_true[idxs], y_pred[idxs], thresholds)
@@ -443,3 +451,21 @@ def ICBEBE_table(selection=None, folder='../output/'):
     for i, row in enumerate(df_rest[cols].values):
         md_source += '| ' + df_rest.index[i].replace('fastai_', '') + ' | ' + row[0] + ' | ' + row[1] + ' | ' + row[2] + ' | [our work]('+our_work+') | [this repo]('+our_repo+')| \n'
     print(md_source)
+
+
+def init_distributed_mode(args):
+    if not args.distributed:
+        args.gpu = 0
+        return
+    args.rank = int(os.environ["RANK"])
+    args.world_size = int(os.environ['WORLD_SIZE'])
+    args.gpu = int(os.environ['LOCAL_RANK'])
+
+    torch.cuda.set_device(args.gpu)
+    args.dist_backend = 'nccl'
+    print('| distributed init (rank {}): {}'.format(
+        args.rank, args.dist_url), flush=True)
+    dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
+                             world_size=args.world_size, rank=args.rank)
+    dist.barrier()
+    setup_for_distributed(args.rank == 0)

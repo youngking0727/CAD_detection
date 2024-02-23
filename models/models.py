@@ -140,8 +140,8 @@ class RNNAttentionModel(nn.Module):
         super().__init__()
  
         self.rnn_layer = RNN(
-            input_size=250,  # 这里原来是46，改成250了，这个250哪来的呢？知道了，前来那个两个1d ConvNormPool 经过两次池化，把1000变成了250
-            hid_size=hid_size, # 但是这里hid_size得注意了，现在默认好像是16，250变成多少合适呢？64？发现这里和1d ConvNormPool 都是用的hid_size
+            input_size=1250,  # 这里原来是46，改成250了，这个1250哪来的呢？知道了，前来那个两个1d ConvNormPool 经过两次池化，把5000变成了1250
+            hid_size=hid_size, # 但是这里hid_size得注意了，现在默认好像是16，1250变成多少合适呢？64？发现这里和1d ConvNormPool 都是用的hid_size
             rnn_type=rnn_type,
             bidirectional=bidirectional
         )
@@ -172,3 +172,86 @@ class RNNAttentionModel(nn.Module):
         x = F.softmax(self.fc(x), dim=-1)
         return x
 
+
+
+class CNN(nn.Module):
+    def __init__(
+        self,
+        input_size = 1,
+        hid_size = 256,
+        kernel_size = 5,
+        num_classes = 5,
+    ):
+        
+        super().__init__()
+        
+        self.conv1 = ConvNormPool(
+            input_size=input_size,
+            hidden_size=hid_size,
+            kernel_size=kernel_size,
+        )
+        self.conv2 = ConvNormPool(
+            input_size=hid_size,
+            hidden_size=hid_size//2,
+            kernel_size=kernel_size,
+        )
+        self.conv3 = ConvNormPool(
+            input_size=hid_size//2,
+            hidden_size=hid_size//4,
+            kernel_size=kernel_size,
+        )
+        self.avgpool = nn.AdaptiveAvgPool1d((1))
+        self.fc = nn.Linear(in_features=hid_size//4, out_features=num_classes)
+        
+    def forward(self, input):
+        x = self.conv1(input)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = self.avgpool(x)        
+        # print(x.shape) # num_features * num_channels
+        x = x.view(-1, x.size(1) * x.size(2))
+        x = F.softmax(self.fc(x), dim=1)
+        return x
+
+
+class RNNModel(nn.Module):
+    def __init__(
+        self,
+        input_size,
+        hid_size,
+        rnn_type,
+        bidirectional,
+        n_classes=5,
+        kernel_size=5,
+    ):
+        super().__init__()
+        
+        # 对于RNN来说，这个input_size就是时间步，也就是1000个长度的心电图经过两次pooling变成了250
+        # 维度解释看这个：https://blog.csdn.net/level_code/article/details/108122808 
+        self.rnn_layer = RNN(
+            input_size=125, #这是一个超参，经过两次pooling，这里应该变成了心电图长度的1/4
+            hid_size=hid_size,
+            rnn_type=rnn_type,
+            bidirectional=bidirectional
+        )
+        self.conv1 = ConvNormPool(
+            input_size=input_size,
+            hidden_size=hid_size,
+            kernel_size=kernel_size,
+        )
+        self.conv2 = ConvNormPool(
+            input_size=hid_size,
+            hidden_size=hid_size,
+            kernel_size=kernel_size,
+        )
+        self.avgpool = nn.AdaptiveAvgPool1d((1))
+        self.fc = nn.Linear(in_features=hid_size, out_features=n_classes)
+
+    def forward(self, input):
+        x = self.conv1(input)
+        x = self.conv2(x)
+        x, _ = self.rnn_layer(x)
+        x = self.avgpool(x)  # 这个池化把最后一个channel，也就是timestep给池化了
+        x = x.view(-1, x.size(1) * x.size(2))
+        x = F.softmax(self.fc(x), dim=1)#.squeeze(1)
+        return x
